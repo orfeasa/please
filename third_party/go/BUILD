@@ -5,18 +5,22 @@ package(default_visibility = ["PUBLIC"])
 go_toolchain(
     name = "toolchain",
     hashes = [
-        "ebca81df938d2d1047cc992be6c6c759543cf309d401b86af38a6aed3d4090f4",  # darwin-amd64
-        "bf8e388b09134164717cd52d3285a4ab3b68691b80515212da0e9f56f518fb1e",  # darwin-arm64
-        "50f421c7f217083ac94aab1e09400cb9c2fea7d337679ec11f1638a11460da30",  # freebsd-amd64
-        "f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265",  # linux-amd64
-        "6a63fef0e050146f275bf02a0896badfe77c11b6f05499bb647e7bd613a45a10",  # linux-arm64
+        "445c0ef19d8692283f4c3a92052cc0568f5a048f4e546105f58e991d4aea54f5", # go1.23.2.darwin-amd64.tar.gz
+        "d87031194fe3e01abdcaf3c7302148ade97a7add6eac3fec26765bcb3207b80f", # go1.23.2.darwin-arm64.tar.gz
+        "025d77f1780906142023a364c31a572afd7d56d3a3be1e4e562e367ca88d3267", # go1.23.2.freebsd-amd64.tar.gz
+        "542d3c1705f1c6a1c5a80d5dc62e2e45171af291e755d591c5e6531ef63b454e", # go1.23.2.linux-amd64.tar.gz
+        "f626cdd92fc21a88b31c1251f419c17782933a42903db87a174ce74eeecc66a9", # go1.23.2.linux-arm64.tar.gz
     ],
     install_std = False,
-    version = "1.22.0",
+    version = "1.23.2",
 )
 
 go_stdlib(
     name = "std",
+    tags = [
+        "netgo",
+        "osusergo",
+    ],
 )
 
 go_repo(

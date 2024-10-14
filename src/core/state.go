@@ -9,6 +9,7 @@ import (
 	"hash/crc64"
 	"io"
 	iofs "io/fs"
+	"iter"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -834,7 +835,9 @@ func (state *BuildState) SyncParsePackage(label BuildLabel) *Package {
 	if p := state.Graph.PackageByLabel(label); p != nil {
 		return p
 	}
-	if ch, inserted := state.progress.pendingPackages.AddOrGet(label.packageKey(), make(chan struct{})); !inserted {
+	if ch, inserted := state.progress.pendingPackages.AddOrGet(label.packageKey(), func() chan struct{} {
+		return make(chan struct{})
+	}); !inserted {
 		waitOnChan(ch, "Still waiting for SyncParsePackage(%v)", label)
 	}
 	return state.Graph.PackageByLabel(label) // Important to check again; it's possible to race against this whole lot.
@@ -888,7 +891,9 @@ func (state *BuildState) WaitForBuiltTarget(l, dependent BuildLabel, mode ParseM
 	}
 	dependent.Name = "all" // Every target in this package depends on this one.
 	// okay, we need to register and wait for this guy.
-	if ch, inserted := state.progress.pendingTargets.AddOrGet(l, make(chan struct{})); !inserted {
+	if ch, inserted := state.progress.pendingTargets.AddOrGet(l, func() chan struct{} {
+		return make(chan struct{})
+	}); !inserted {
 		// Something's already registered for this, get on the train
 		waitOnChan(ch, "Still waiting on WaitForBuiltTarget(%v, %v, %v)", l, dependent, mode)
 		return state.Graph.Target(l)
@@ -1009,7 +1014,7 @@ func (state *BuildState) ActivateTarget(pkg *Package, label, dependent BuildLabe
 			if dependent != OriginalTarget {
 				msg += fmt.Sprintf(" (depended on by %s)", dependent)
 			}
-			return fmt.Errorf(msg + suggestTargets(pkg, label, dependent))
+			return fmt.Errorf("%s", msg+suggestTargets(pkg, label, dependent))
 		}
 	}
 	if state.ParsePackageOnly && !mode.IsForSubinclude() {
@@ -1325,23 +1330,26 @@ func (state *BuildState) DownloadAllInputs(target *BuildTarget, targetDir string
 	return state.RemoteClient.DownloadInputs(target, targetDir, isTest)
 }
 
-// IterInputs returns a channel that iterates all the input files needed for a target.
-func (state *BuildState) IterInputs(target *BuildTarget, test bool) <-chan BuildInput {
+// IterInputs returns a an iterator over all the input files needed for a target.
+func (state *BuildState) IterInputs(target *BuildTarget, test bool) iter.Seq[BuildInput] {
 	if !test {
 		return IterInputs(state, state.Graph, target, true, target.IsFilegroup)
 	}
-	ch := make(chan BuildInput)
-	go func() {
-		ch <- target.Label
+	return func(yield func(BuildInput) bool) {
+		if !yield(target.Label) {
+			return
+		}
 		for _, datum := range target.AllData() {
-			ch <- datum
+			if !yield(datum) {
+				return
+			}
 		}
-		for _, datum := range target.AllTestTools() {
-			ch <- datum
+		for _, tool := range target.AllTestTools() {
+			if !yield(tool) {
+				return
+			}
 		}
-		close(ch)
-	}()
-	return ch
+	}
 }
 
 // DisableXattrs disables xattr support for this build. This is done for filesystems that
